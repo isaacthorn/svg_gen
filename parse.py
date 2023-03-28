@@ -1,67 +1,77 @@
+from ply import yacc
+from lex import tokens
+
 import complex
-from types import NoneType
-from typing import Tuple
-from dataclasses import dataclass
-from enum import Enum
+
+def p_chain_clover_domain(p):
+    '''chain : clover 
+             | domain'''
+    p[0] = complex.Chain([p[1]])
+
+def p_chain_chain_clover(p):
+    'chain : chain clover'
+    p[0] = complex.Chain(p[1].within + [p[2]])
+
+def p_chain_chain_domain(p):
+    'chain : chain domain'
+    p[0] = complex.Chain(p[1].within + [p[2]])
 
 
-class TokenType(Enum):
-    DOMAIN_UNBOUND = 0
-    DOMAIN_OPEN = 1
-    DOMAIN_CLOSE = 2
-    NEW_STRAND = 3
+def p_clover_hairpin_splitcomplex(p):
+    '''clover : hairpin 
+              | splitcomplex'''
+    p[0] = complex.Clover([p[1]])
+
+def p_clover_clover_hairpin(p):
+    'clover : clover hairpin'
+    p[0] = complex.Clover(p[1].within + [p[2]])
+
+def p_clover_clover_splitcomplex(p):
+    'clover : clover splitcomplex'
+    p[0] = complex.Clover(p[1].within + [p[2]])
 
 
-class Token:
-    def __init__(self, type: TokenType, **kwargs):
-        self.type = type
-        self.__dict__.update(kwargs)
+def p_hairpin(p):
+    'hairpin : domainopen chain RPAREN'
+    p[0] = complex.Hairpin(p[1], p[2], complex.create_complementary(p[1]))
 
 
-def parse_token(token: str) -> Token:
-    if token == ')':
-        return Token(TokenType.DOMAIN_CLOSE)
-    elif token == '+':
-        return Token(TokenType.NEW_STRAND)
-    elif token[-1] == '(':
-        return Token(TokenType.DOMAIN_OPEN, name=token[0: -1])
-    else:
-        return Token(TokenType.DOMAIN_UNBOUND, name=token)
-
-
-def parse(notation: str) -> complex.Complex:
+def p_splitcomplex_l_r(p):
+    'splitcomplex : domainopen chain PLUS chain RPAREN'
+    p[0] = complex.SplitComplex(p[1], p[2], p[4], complex.create_complementary(p[1]))
     
-    bonding_stack: list[complex.Domain] = []
-
-    result = complex.Complex([])
-
-    cur_strand_i = 0
-    cur_strand = complex.Strand(f's{cur_strand_i}')
-
-    for token_str in notation.split(' '):
-        token = parse_token(token_str)
-        match token.type:
-            case TokenType.DOMAIN_OPEN:
-                new_domain = cur_strand.add_domain(name=token.name)
-                bonding_stack.append(new_domain)
-            case TokenType.DOMAIN_CLOSE:
-                bonded = bonding_stack.pop()
-                new_domain = cur_strand.add_domain(name=bonded.name + '*', bond=bonded)
-                bonded.bond = new_domain
-            case TokenType.DOMAIN_UNBOUND:
-                cur_strand.add_domain(name=token.name)
-            case TokenType.NEW_STRAND:
-                result.strands.append(cur_strand)
-                cur_strand_i += 1
-                cur_strand = complex.Strand(f's{cur_strand_i}')
-            case _:
-                raise NotImplementedError()
-    result.strands.append(cur_strand)
+def p_splitcomplex_l(p):
+    'splitcomplex : domainopen chain PLUS RPAREN'
+    p[0] = complex.SplitComplex(p[1], p[2], None, complex.create_complementary(p[1]))
     
-    return result
+def p_splitcomplex_r(p):
+    'splitcomplex : domainopen PLUS chain RPAREN'
+    p[0] = complex.SplitComplex(p[1], None, p[3], complex.create_complementary(p[1]))
+    
+def p_splitcomplex_neither(p):
+    'splitcomplex : domainopen PLUS RPAREN'
+    p[0] = complex.SplitComplex(p[1], None, None, complex.create_complementary(p[1]))
+
+
+def p_domain(p):
+    'domain : LABEL'
+    p[0] = complex.Domain(p[1])
+
+def p_domainopen(p):
+    'domainopen : LABEL_OPEN'
+    p[0] = complex.Domain(p[1][:-1])
+    
+
+parser = yacc.yacc()
+
+
+def parse(data: str):
+    return parser.parse(data)
 
 
 if __name__ == '__main__':
-    structure = parse('a b( c ) d( e f( g h( + ) ) i j( k l( + ) m ) n o( p + q( + ) ) r )')
-    for strand in structure.strands:
-        print(str(strand))
+    from sys import argv
+    if len(argv) > 1:
+        ast = parse(argv[1])
+        print(f'After parsing, {argv[1]} = {str(ast)}')
+

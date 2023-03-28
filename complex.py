@@ -3,31 +3,58 @@ from types import NoneType
 from typing import Sequence
 
 
+
+@dataclass
 class Domain:
-    def __init__(self, name: str, bond: 'Domain' = None):
-        self.name = name
-        self.bond = bond
+    name: str
 
-    def __repr__(self):
-        if self.bond:
-            return f'<Domain name={self.name}, bond={self.bond.name}>'
-        return f'<Domain name={self.name}>'
-
-
-class Strand:
-    def __init__(self, name: str):
-        self.name = name
-        self.domains: list[Domain] = []
-    
     def __str__(self):
-        domain_str = ' '.join(repr(domain) for domain in self.domains)
-        return f'Strand({self.name}) {{{domain_str}}}'
-
-    def add_domain(self, **kwargs) -> Domain:
-        self.domains.append(Domain(**kwargs))
-        return self.domains[-1]
+        return self.name
 
 
 @dataclass
-class Complex:
-    strands: list[Strand]
+class Hairpin:
+    pre: Domain
+    inner: 'Chain'
+    post: Domain
+
+    def __str__(self):
+        return f'{str(self.pre)}( {str(self.inner)} )'
+
+
+@dataclass
+class SplitComplex:
+    pre: Domain
+    left: 'Chain | NoneType'
+    right: 'Chain | NoneType'
+    post: Domain
+
+    def __str__(self):
+        if self.left and self.right:
+            return f'{str(self.pre)}( {str(self.left)} + {str(self.right)} )'
+        elif self.left:
+            return f'{str(self.pre)}( {str(self.left)} + )'
+        elif self.right:
+            return f'{str(self.pre)}( + {str(self.right)} )'
+        else:
+            return f'{str(self.pre)}( + )'
+
+
+@dataclass
+class Clover:
+    within: list[Hairpin | SplitComplex]
+
+    def __str__(self):
+        return ' '.join(str(el) for el in self.within)
+
+
+@dataclass
+class Chain:
+    within: list[Clover | Domain]
+
+    def __str__(self):
+        return ' '.join(str(el) for el in self.within)
+
+
+def create_complementary(domain: Domain) -> Domain:
+    return Domain(domain.name + '*')
