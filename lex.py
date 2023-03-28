@@ -21,3 +21,15 @@ def t_error(t):
 
 
 lexer = lex.lex()
+
+
+def tokenise(data: str):
+    lexer.input(data)
+    return list(lexer)
+
+
+if __name__ == '__main__':
+    from sys import argv
+    if len(argv) > 1:
+        tokens = tokenise(argv[1])
+        print(tokens)
