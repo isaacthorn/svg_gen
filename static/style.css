@@ -1,0 +1,52 @@
+
+
+body {
+    background-color: darkgray;
+    font-family: sans-serif;
+}
+
+div {
+    margin: auto;
+}
+
+#run-input {
+    font-family: monospace;
+}
+
+#top-container {
+    max-width: 960px;
+}
+
+#run-input {
+    width: 100%;
+}
+
+#results-container {
+    min-height: 500px;
+    display: flex;
+}
+
+div > #results-container {
+    flex: 1;
+}
+
+svg {
+    display: block;
+    margin: auto;
+
+    background-color: black;
+}
+
+.monospace {
+    font-family: monospace;
+}
+
+.inp_good {
+    background-color: #3fa73f;
+}
+.inp_pending {
+    background-color: #c1d93b;
+}
+.inp_error {
+    background-color: #bd2c33;
+}

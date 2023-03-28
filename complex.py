@@ -7,6 +7,7 @@ from typing import Sequence
 @dataclass
 class Domain:
     name: str
+    type: str = 'Domain'
 
     def __str__(self):
         return self.name
@@ -17,6 +18,7 @@ class Hairpin:
     pre: Domain
     inner: 'Chain'
     post: Domain
+    type: str = 'Hairpin'
 
     def __str__(self):
         return f'{str(self.pre)}( {str(self.inner)} )'
@@ -28,6 +30,7 @@ class SplitComplex:
     left: 'Chain | NoneType'
     right: 'Chain | NoneType'
     post: Domain
+    type: str = 'SplitComplex'
 
     def __str__(self):
         if self.left and self.right:
@@ -43,6 +46,7 @@ class SplitComplex:
 @dataclass
 class Clover:
     within: list[Hairpin | SplitComplex]
+    type: str = 'Clover'
 
     def __str__(self):
         return ' '.join(str(el) for el in self.within)
@@ -51,6 +55,7 @@ class Clover:
 @dataclass
 class Chain:
     within: list[Clover | Domain]
+    type: str = 'Chain'
 
     def __str__(self):
         return ' '.join(str(el) for el in self.within)

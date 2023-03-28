@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <title>web-tester</title>
+        <link rel="stylesheet" href={{ url_for('static', filename='style.css') }}>
+        <script src={{ url_for('static', filename='demo.js') }}></script>
+    </head>
+    <body onload="OnLoad()">
+        <div id="top-container">
+            <h1>Demo</h1>
+            <div id="input-container">
+                <input type="text" id="run-input" onkeyup="SubmitNewInput()">
+            </div>
+        </div>
+        <div id="results-container">
+            <!--
+                <div id="svg-container">
+                <h2>Final Output</h2>
+                <svg></svg>
+            </div>
+            -->
+            <div id="tokens-container">
+                <h2>Tokens</h2>
+                <pre id="tokens-area" class="monospace"></ul>
+            </div>
+            <div id="ast-container">
+                <h2>AST</h2>
+                <pre id="ast-area" class="monospace"></p>
+            </div>
+        </div>
+    </body>
+</html>
