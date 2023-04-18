@@ -44,17 +44,8 @@ class SplitComplex:
 
 
 @dataclass
-class Clover:
-    within: list[Hairpin | SplitComplex]
-    # type: str = 'Clover'
-
-    def __str__(self):
-        return ' '.join(str(el) for el in self.within)
-
-
-@dataclass
 class Chain:
-    within: list[Clover | Domain]
+    within: list[Domain | Hairpin | SplitComplex]
     # type: str = 'Chain'
 
     def __str__(self):
