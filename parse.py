@@ -72,6 +72,10 @@ def parse(data: str):
 if __name__ == '__main__':
     from sys import argv
     if len(argv) > 1:
-        ast = parse(argv[1])
-        print(f'After parsing, {argv[1]} = {str(ast)}')
+        string = argv[1]
+    else:
+        string = input('>>> ')
+    ast = parse(string)
+    print(repr(ast))
+    print(f'After parsing, {string} = {str(ast)}')
 
