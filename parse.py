@@ -4,24 +4,24 @@ from lex import tokens
 import complex
 
 
-def p_chain_domain_hairpin_splitcomplex(p):
+def p_chain_begin(p):
     '''chain : domain
              | hairpin
              | splitcomplex'''
     p[0] = complex.Chain([p[1]])
 
 
-def p_chain_chain_domain(p):
+def p_chain_extend_domain(p):
     'chain : chain domain'
     p[0] = complex.Chain(p[1].within + [p[2]])
 
 
-def p_chain_chain_hairpin(p):
+def p_chain_extend_hairpin(p):
     'chain : chain hairpin'
     p[0] = complex.Chain(p[1].within + [p[2]])
 
 
-def p_chain_chain_splitcomplex(p):
+def p_chain_extend_splitcomplex(p):
     'chain : chain splitcomplex'
     p[0] = complex.Chain(p[1].within + [p[2]])
 
