@@ -1,36 +1,34 @@
 from dataclasses import dataclass
-from types import NoneType
-from typing import Sequence
 
+
+class Node:
+    pass
 
 
 @dataclass
-class Domain:
+class Domain(Node):
     name: str
-    # type: str = 'Domain'
 
     def __str__(self):
         return self.name
 
 
 @dataclass
-class Hairpin:
+class Hairpin(Node):
     pre: Domain
     inner: 'Chain'
     post: Domain
-    # type: str = 'Hairpin'
 
     def __str__(self):
         return f'{str(self.pre)}( {str(self.inner)} )'
 
 
 @dataclass
-class SplitComplex:
+class SplitComplex(Node):
     pre: Domain
     left: 'Chain | NoneType'
     right: 'Chain | NoneType'
     post: Domain
-    # type: str = 'SplitComplex'
 
     def __str__(self):
         if self.left and self.right:
@@ -44,9 +42,8 @@ class SplitComplex:
 
 
 @dataclass
-class Chain:
+class Chain(Node):
     within: list[Domain | Hairpin | SplitComplex]
-    # type: str = 'Chain'
 
     def __str__(self):
         return ' '.join(str(el) for el in self.within)

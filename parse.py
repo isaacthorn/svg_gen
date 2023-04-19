@@ -63,8 +63,11 @@ def p_domainopen(p):
 parser = yacc.yacc()
 
 
-def parse(data: str) -> complex.Chain:
-    return parser.parse(data)
+def parse(data: str) -> complex.Node:
+    parsed = parser.parse(data)
+    if isinstance(parsed, complex.Chain) and len(parsed.within) == 1:
+        return parsed.within[0]
+    return parsed
 
 
 if __name__ == '__main__':
