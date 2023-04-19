@@ -63,7 +63,7 @@ def p_domainopen(p):
 parser = yacc.yacc()
 
 
-def parse(data: str):
+def parse(data: str) -> complex.Chain:
     return parser.parse(data)
 
 
