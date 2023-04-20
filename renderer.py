@@ -21,10 +21,10 @@ class SVGRenderer(Renderer):
 
         self.svg = svgwrite.Drawing(filename)
 
-        self.offset = (350.0, 350.0)
+        self.offset = (350.0, 50.0)
 
     def render(self):
-        self.root.local_transform = geometry.Transformation(geometry.Position(*self.offset))
+        self.root.local_transform = geometry.Transformation(geometry.Position(*self.offset), -0.5 * math.pi)
         self.visit_node(self.root)
         self.svg.save()
 
@@ -69,6 +69,25 @@ class SVGRenderer(Renderer):
                                        (angle_line_end.x, angle_line_end.y),
                                        stroke='black')
             self.svg.add(angle_line)
+        elif isinstance(node, geometry.Gap):
+            start = node.get_root()
+            end = start + node.end_transform
+
+            if not node.circle_radius:
+                # Straight gap
+                domain_line = self.svg.line((start.translation.x, start.translation.y),
+                                            (end.translation.x, end.translation.y),
+                                            stroke=colour)
+                self.svg.add(domain_line)
+            else:
+                # Curved gap
+                domain_line = self.svg.path(f'M{start.translation.x},{start.translation.y}', fill='none', stroke=colour)
+                domain_line.push_arc(target=(end.translation.x, end.translation.y),
+                                     rotation=0.0,
+                                     r=node.circle_radius,
+                                     large_arc=(node.circle_theta > math.pi),
+                                     absolute=True)
+                self.svg.add(domain_line)
         else:
             raise NotImplementedError()
 
@@ -84,6 +103,8 @@ if __name__ == '__main__':
     print(repr(ast))
 
     layout = geometry.create_geometry(None, ast)
+
+    print(repr(layout))
     layout.layout(None)
     print(repr(layout))
 

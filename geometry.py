@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from itertools import pairwise
 from typing import Optional
 
 import complex
@@ -8,6 +8,7 @@ import abc
 
 DEFAULT_DOMAIN_LENGTH = 50
 DEFAULT_BOUND_GAP = 5
+DEFAULT_SPACING_GAP = 5
 
 
 class Position:
@@ -51,6 +52,9 @@ class Position:
         return Position(self.x * math.cos(theta) - self.y * math.sin(theta),
                         self.x * math.sin(theta) + self.y * math.cos(theta))
 
+    def __neg__(self) -> 'Position':
+        return Position(-self.x, -self.y)
+
 
 class Transformation:
     """
@@ -65,6 +69,9 @@ class Transformation:
 
     def __repr__(self):
         return f'{self.translation}, {self.rotation:.2f} rad'
+
+    def inverse(self):
+        return Transformation((-self.translation).rotate(-self.rotation), -self.rotation)
 
     def __add__(self, other: 'Transformation'):
         """
@@ -91,7 +98,7 @@ class Node(metaclass=abc.ABCMeta):
     This transformation should consider positive-x as forwards. Positive-y is down, as in SVG.
     """
 
-    def __init__(self, parent: Optional['Node'], source: complex.Node):
+    def __init__(self, parent: Optional['Node'], source: Optional[complex.Node]):
         """
         Initialise the node with a parent and source
 
@@ -131,6 +138,42 @@ class Node(metaclass=abc.ABCMeta):
         pass
 
 
+def calculate_end_on_circle(radius: float, theta: float) -> Transformation:
+    return Transformation(Position(radius * math.sin(theta), radius * (1 - math.cos(theta))), theta)
+
+
+class Gap(Node):
+    """
+    Pseudo-node type used to represent a spacing component within the geometry
+
+    For example, between 2 parts of a circular chain which are both not domain elements, a small gap should be placed
+    """
+
+    def __init__(self, parent: Optional[Node]):
+        super().__init__(parent, None)
+
+        self.circle_radius = None
+        self.circle_theta = None
+
+        self.length = DEFAULT_SPACING_GAP
+
+    def __repr__(self):
+        return f'Gap({self.length})'
+
+    def start_to_end(self) -> float:
+        return self.length
+
+    def layout(self, circle_radius: Optional[float]):
+        self.circle_radius = circle_radius
+        if self.circle_radius:
+            # Calculate end transform as if we're on a circle
+            self.circle_theta = self.length / self.circle_radius
+            self.end_transform = calculate_end_on_circle(self.circle_radius, self.circle_theta)
+        else:
+            # We're running in a straight line
+            self.end_transform = Transformation(Position(0.0, -self.length), -0.5 * math.pi)
+
+
 class Domain(Node):
     def __init__(self, parent: Optional[Node], source: complex.Domain):
         super().__init__(parent, source)
@@ -142,7 +185,7 @@ class Domain(Node):
         self.length = DEFAULT_DOMAIN_LENGTH
 
     def __repr__(self):
-        return f'Domain({self.end_transform})({self.source.name})'
+        return f'Domain({self.source.name})'
 
     def start_to_end(self) -> float:
         return self.length
@@ -152,9 +195,7 @@ class Domain(Node):
         if self.circle_radius:
             # Calculate end transform as if we're on a circle
             self.circle_theta = self.length / self.circle_radius
-            self.end_transform = Transformation(Position(self.circle_radius * math.sin(self.circle_theta),
-                                                         self.circle_radius * (1 - math.cos(self.circle_theta))),
-                                                self.circle_theta)
+            self.end_transform = calculate_end_on_circle(self.circle_radius, self.circle_theta)
         else:
             # We're running in a straight line
             self.end_transform = Transformation(Position(0.0, -self.length), -0.5 * math.pi)
@@ -172,7 +213,7 @@ class Hairpin(Node):
         self.gap = DEFAULT_BOUND_GAP
 
     def __repr__(self):
-        return f'Hairpin({self.get_root().translation})({self.pre.source.name}){repr(self.inner)}'
+        return f'Hairpin({self.pre.source.name}){repr(self.inner)}'
 
     def start_to_end(self) -> float:
         return self.gap
@@ -189,7 +230,12 @@ class Hairpin(Node):
         inner_angle_error = math.pi - self.inner.end_transform.translation.angle()
         self.inner.local_transform = Transformation(Position(0.0, -self.pre.length), math.pi + inner_angle_error)
 
-        self.end_transform = Transformation(Position(self.gap, 0.0))
+        if circle_radius:
+            # Inverse crd(theta) (\theta = 2 \cdot arcsin(\dfrac{c}{2r}))
+            theta = 2.0 * math.asin(self.gap / (2.0 * circle_radius))
+            self.end_transform = calculate_end_on_circle(circle_radius, theta)
+        else:
+            self.end_transform = Transformation(Position(self.gap, 0.0))
 
 
 class SplitComplex(Node):
@@ -204,7 +250,7 @@ class SplitComplex(Node):
         self.gap = DEFAULT_BOUND_GAP
 
     def __repr__(self):
-        return f'SplitComplex({self.get_root().translation})({self.pre.source.name})<{repr(self.left)},{repr(self.right)}>'
+        return f'SplitComplex({self.pre.source.name})<{repr(self.left)},{repr(self.right)}>'
 
     def start_to_end(self) -> float:
         return self.gap
@@ -222,9 +268,15 @@ class SplitComplex(Node):
             self.left.local_transform = Transformation(Position(0.0, -self.pre.length), -angle_from_forward)
         if self.right:
             self.right.layout(None, layout_circular=False)
-            self.right.local_transform = Transformation(Position(self.gap, -self.post.length), angle_from_forward)
+            self.right.local_transform = Transformation(Position(self.gap, -self.post.length), angle_from_forward) \
+                + self.right.end_transform.inverse()
 
-        self.end_transform = Transformation(Position(self.gap, 0.0))
+        if circle_radius:
+            # Inverse crd(theta) (\theta = 2 \cdot arcsin(\dfrac{c}{2r}))
+            theta = 2.0 * math.asin(self.gap / (2.0 * circle_radius))
+            self.end_transform = calculate_end_on_circle(circle_radius, theta)
+        else:
+            self.end_transform = Transformation(Position(self.gap, 0.0))
 
 
 class Chain(Node):
@@ -235,7 +287,7 @@ class Chain(Node):
 
     def __repr__(self):
         within_str = ', '.join(repr(node) for node in self.within)
-        return f'({self.end_transform})[{within_str}]'
+        return f'[{within_str}]'
 
     def start_to_end(self) -> float:
         # Chains are never laid out as components of circles, so this works. Probably a better way to do it though
@@ -263,11 +315,31 @@ class Chain(Node):
         circumference = sum(node.start_to_end() for node in self.within) + DEFAULT_BOUND_GAP
         return circumference / (2.0 * math.pi)
 
+    def check_needs_gap(self, i: int) -> bool:
+        """
+        Should we insert a Gap element between within[i] and within[i + 1]
+        (The final element of within precedes a Domain, since it comes before self.post)
+        A gap needs to be inserted between any pair of children which are BOTH NOT domains (e.g hairpin -> hairpin)
+        """
+        if i + 1 == len(self.within):
+            return not isinstance(self.within[i], Domain)
+        return not isinstance(self.within[i], Domain) and not isinstance(self.within[i + 1], Domain)
+
     def layout(self, circle_radius: Optional[float], layout_circular: bool = True):
         """
         :param layout_circular: Only valid for chains, determines whether the chain should be laid out in a circle or
         just end-to-end
         """
+
+        # If we're on a circle with len() > 1, insert gaps between pairs of non-domain children
+        # Can't modify the list while iterating
+        if layout_circular and len(self.within) > 1:
+            new_within = []
+            for i in range(len(self.within)):
+                new_within.append(self.within[i])
+                if self.check_needs_gap(i):
+                    new_within.append(Gap(self))
+            self.within = new_within
 
         # Calculate the radius of the circle
         inner_radius = None if not layout_circular else self.calculate_inner_radius()
