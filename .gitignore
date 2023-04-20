@@ -3,3 +3,4 @@ venv/*
 
 parser.out
 parsetab.py
+/out.svg

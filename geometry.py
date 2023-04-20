@@ -148,8 +148,6 @@ class Domain(Node):
         return self.length
 
     def layout(self, circle_radius: Optional[float]):
-        print(f'Doing domain {self.source.name} with radius {circle_radius}')
-
         self.circle_radius = circle_radius
         if self.circle_radius:
             # Calculate end transform as if we're on a circle
@@ -159,7 +157,7 @@ class Domain(Node):
                                                 self.circle_theta)
         else:
             # We're running in a straight line
-            self.end_transform = Transformation(Position(self.length, 0.0), 0.0)
+            self.end_transform = Transformation(Position(0.0, -self.length), -0.5 * math.pi)
 
 
 class Hairpin(Node):
@@ -181,15 +179,50 @@ class Hairpin(Node):
 
     def layout(self, circle_radius: Optional[float]):
         self.pre.layout(None)
-        self.pre.local_transform = Transformation(Position(), math.pi * -0.5)
+        self.pre.local_transform = Transformation(Position(), 0.0)
 
         self.post.layout(None)
-        self.post.local_transform = Transformation(Position(self.gap, -self.post.length), math.pi * 0.5)
+        self.post.local_transform = Transformation(Position(self.gap, -self.post.length), math.pi)
 
         self.inner.layout(None, layout_circular=True)
 
         inner_angle_error = math.pi - self.inner.end_transform.translation.angle()
         self.inner.local_transform = Transformation(Position(0.0, -self.pre.length), math.pi + inner_angle_error)
+
+        self.end_transform = Transformation(Position(self.gap, 0.0))
+
+
+class SplitComplex(Node):
+    def __init__(self, parent: Optional[Node], source: complex.SplitComplex):
+        super().__init__(parent, source)
+
+        self.pre = Domain(self, source.pre)
+        self.post = Domain(self, source.post)
+        self.left = Chain(self, source.left) if source.left else None
+        self.right = Chain(self, source.right) if source.right else None
+
+        self.gap = DEFAULT_BOUND_GAP
+
+    def __repr__(self):
+        return f'SplitComplex({self.get_root().translation})({self.pre.source.name})<{repr(self.left)},{repr(self.right)}>'
+
+    def start_to_end(self) -> float:
+        return self.gap
+
+    def layout(self, circle_radius: Optional[float]):
+        self.pre.layout(None)
+        self.pre.local_transform = Transformation(Position(), 0.0)
+
+        self.post.layout(None)
+        self.post.local_transform = Transformation(Position(self.gap, -self.post.length), math.pi)
+
+        angle_from_forward = (0.25 * math.pi if self.left and self.right else 0.0)
+        if self.left:
+            self.left.layout(None, layout_circular=False)
+            self.left.local_transform = Transformation(Position(0.0, -self.pre.length), -angle_from_forward)
+        if self.right:
+            self.right.layout(None, layout_circular=False)
+            self.right.local_transform = Transformation(Position(self.gap, -self.post.length), angle_from_forward)
 
         self.end_transform = Transformation(Position(self.gap, 0.0))
 
@@ -264,6 +297,8 @@ def create_geometry(parent: Optional[Node], node: complex.Node) -> Node:
         return Hairpin(parent, node)
     elif isinstance(node, complex.Chain):
         return Chain(parent, node)
+    elif isinstance(node, complex.SplitComplex):
+        return SplitComplex(parent, node)
     else:
         raise NotImplementedError(f'Unsupported geometry operation {type(node).__qualname__}')
 

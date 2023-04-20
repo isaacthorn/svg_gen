@@ -21,17 +21,24 @@ class SVGRenderer(Renderer):
 
         self.svg = svgwrite.Drawing(filename)
 
-        self.offset = (150.0, 150.0)
+        self.offset = (350.0, 350.0)
 
     def render(self):
         self.root.local_transform = geometry.Transformation(geometry.Position(*self.offset))
         self.visit_node(self.root)
         self.svg.save()
 
-    def visit_node(self, node: geometry.Node):
+    def visit_node(self, node: geometry.Node, colour: str = 'red'):
+        if not node:
+            return
         if isinstance(node, geometry.Chain):
             for child in node.within:
-                self.visit_node(child)
+                self.visit_node(child, colour)
+        elif isinstance(node, geometry.SplitComplex):
+            self.visit_node(node.pre, colour='orange')
+            self.visit_node(node.post, colour='red')
+            self.visit_node(node.left, colour='purple')
+            self.visit_node(node.right, colour='green')
         elif isinstance(node, geometry.Hairpin):
             self.visit_node(node.pre)
             self.visit_node(node.post)
@@ -44,13 +51,16 @@ class SVGRenderer(Renderer):
                 # Straight domain
                 domain_line = self.svg.line((start.translation.x, start.translation.y),
                                             (end.translation.x, end.translation.y),
-                                            stroke='rgb(255, 0, 0)')
+                                            stroke=colour)
                 self.svg.add(domain_line)
             else:
                 # Curved domain
-                domain_line = self.svg.path(f'M{start.translation.x},{start.translation.y}', fill='none', stroke='blue')
+                domain_line = self.svg.path(f'M{start.translation.x},{start.translation.y}', fill='none', stroke=colour)
                 domain_line.push_arc(target=(end.translation.x, end.translation.y),
-                                     rotation=0.0, r=node.circle_radius, large_arc=False, absolute=True)
+                                     rotation=0.0,
+                                     r=node.circle_radius,
+                                     large_arc=(node.circle_theta > math.pi),
+                                     absolute=True)
                 self.svg.add(domain_line)
 
             angle_line_end = end.translation.translate(geometry.Position(4.0, 0.0)
