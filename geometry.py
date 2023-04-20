@@ -129,6 +129,18 @@ class Node(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
+    def needs_circle_fix(self) -> bool:
+        """
+        Check whether this type needs the 'circle fix'
+
+        For Node types which lay themselves out on a circle properly (Domain and Gap), the chain doesn't have to rotate
+        them, but types which can only lay themselves out in a straight line, the chain has to compensate for their
+        angle in their local_transform. This applies only to Hairpins and SplitComplexes, since chains themselves are
+        never placed directly as part of a circle
+        """
+        pass
+
+    @abc.abstractmethod
     def layout(self, circle_radius: Optional[float]):
         """
         Calculate internal layout (end position)
@@ -163,6 +175,9 @@ class Gap(Node):
     def start_to_end(self) -> float:
         return self.length
 
+    def needs_circle_fix(self) -> bool:
+        return False
+
     def layout(self, circle_radius: Optional[float]):
         self.circle_radius = circle_radius
         if self.circle_radius:
@@ -189,6 +204,9 @@ class Domain(Node):
 
     def start_to_end(self) -> float:
         return self.length
+
+    def needs_circle_fix(self) -> bool:
+        return False
 
     def layout(self, circle_radius: Optional[float]):
         self.circle_radius = circle_radius
@@ -217,6 +235,9 @@ class Hairpin(Node):
 
     def start_to_end(self) -> float:
         return self.gap
+
+    def needs_circle_fix(self) -> bool:
+        return True
 
     def layout(self, circle_radius: Optional[float]):
         self.pre.layout(None)
@@ -255,6 +276,9 @@ class SplitComplex(Node):
     def start_to_end(self) -> float:
         return self.gap
 
+    def needs_circle_fix(self) -> bool:
+        return True
+
     def layout(self, circle_radius: Optional[float]):
         self.pre.layout(None)
         self.pre.local_transform = Transformation(Position(), 0.0)
@@ -292,6 +316,9 @@ class Chain(Node):
     def start_to_end(self) -> float:
         # Chains are never laid out as components of circles, so this works. Probably a better way to do it though
         return DEFAULT_BOUND_GAP
+
+    def needs_circle_fix(self) -> bool:
+        return False
 
     def calculate_inner_radius(self) -> float:
         """
@@ -350,8 +377,8 @@ class Chain(Node):
         for node in self.within:
             node.layout(inner_radius)
 
-            # angle_adjustment = (-math.pi / 2.0) if isinstance(node, Hairpin) else 0.0
-            node.local_transform = Transformation(cur_transform.translation, cur_transform.rotation)
+            angle_adjustment = node.end_transform.translation.angle() if node.needs_circle_fix() else 0.0
+            node.local_transform = Transformation(cur_transform.translation, cur_transform.rotation + angle_adjustment)
 
             cur_transform = cur_transform + node.end_transform
 
