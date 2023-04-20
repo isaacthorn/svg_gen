@@ -292,6 +292,8 @@ class SplitComplex(Node):
             self.left.local_transform = Transformation(Position(0.0, -self.pre.length), -angle_from_forward)
         if self.right:
             self.right.layout(None, layout_circular=False)
+            # TODO: If the right hand chain is a [Domain], its final angle is off by -pi/2, possible the end_transform
+            # of the Chain is wrong also
             self.right.local_transform = Transformation(Position(self.gap, -self.post.length), angle_from_forward) \
                 + self.right.end_transform.inverse()
 
@@ -357,6 +359,10 @@ class Chain(Node):
         :param layout_circular: Only valid for chains, determines whether the chain should be laid out in a circle or
         just end-to-end
         """
+
+        # If we only have one child, and it isn't curvable, we don't NEED to layout on a circle (we can't)
+        if len(self.within) == 1 and self.within[0].needs_circle_fix():
+            layout_circular = False
 
         # If we're on a circle with len() > 1, insert gaps between pairs of non-domain children
         # Can't modify the list while iterating
