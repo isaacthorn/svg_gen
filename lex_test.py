@@ -87,6 +87,7 @@ def test_erratic_whitespace(input_str: str, expected_tokens: list[str]):
     ('a( b c', ['a(', 'b', 'c']),
     ('a( b c( d', ['a(', 'b', 'c(', 'd']),
     ('a( b c( d e f( g h ', ['a(', 'b', 'c(', 'd', 'e', 'f(', 'g', 'h']),
+    ('abc def', ['abc', 'def'])
 ])
 def test_label_names(input_str: str, expected_names: list[str]):
     """
