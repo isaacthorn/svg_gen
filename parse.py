@@ -55,10 +55,15 @@ def p_domain(p):
     'domain : LABEL'
     p[0] = complex.Domain(p[1])
 
+
 def p_domainopen(p):
     'domainopen : LABEL_OPEN'
     p[0] = complex.Domain(p[1][:-1])
     
+
+def p_error(p):
+    raise ValueError('Invalid parse')
+
 
 parser = yacc.yacc()
 
@@ -78,5 +83,3 @@ if __name__ == '__main__':
         string = input('>>> ')
     ast = parse(string)
     print(repr(ast))
-    print(f'After parsing, {string} = {str(ast)}')
-
