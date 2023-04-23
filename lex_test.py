@@ -99,3 +99,15 @@ def test_label_names(input_str: str, expected_names: list[str]):
 
     assert len(parsed) == len(expected_names)
     assert all(token.value == expected for token, expected in zip(parsed, expected_names))
+
+
+@pytest.mark.parametrize('input_str', [
+    '*',
+    'a b *',
+    'a( * )',
+    'a( + * )'
+])
+def test_raises_illegal_char(input_str: str):
+    with pytest.raises(ValueError) as e:
+        lex.tokenise(input_str)
+    assert 'Illegal character' in str(e.value)
