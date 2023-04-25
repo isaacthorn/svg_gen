@@ -6,8 +6,8 @@ import geometry
 import svgwrite
 
 
-DEFAULT_ARROWHEAD_BODY_LEN = 5
-DEFAULT_ARROWHEAD_HEAD_LEN = 4
+DEFAULT_ARROWHEAD_BODY_LEN = 9
+DEFAULT_ARROWHEAD_HEAD_LEN = 7
 
 
 class Renderer:
@@ -215,13 +215,7 @@ if __name__ == '__main__':
     ast = parse.parse(string)
     print(repr(ast))
 
-    layout = geometry.create_geometry(None, ast)
-
-    print(repr(layout))
-    layout.layout(None)
-    layout.set_as_start()
-    layout.set_as_end()
-    print(repr(layout))
+    layout = geometry.layout_geometry(ast)
 
     renderer = SVGRenderer('out.svg', root=layout)
     renderer.render()

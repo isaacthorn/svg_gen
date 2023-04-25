@@ -474,6 +474,14 @@ def create_geometry(parent: Optional[Node], node: complex.Node) -> Node:
         raise NotImplementedError(f'Unsupported geometry operation {type(node).__qualname__}')
 
 
+def layout_geometry(root: complex.Node) -> Node:
+    layout = create_geometry(None, root)
+    layout.layout(None)
+    layout.set_as_start()
+    layout.set_as_end()
+    return layout
+
+
 if __name__ == '__main__':
     from sys import argv
 
