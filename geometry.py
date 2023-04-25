@@ -55,6 +55,12 @@ class Position:
     def __neg__(self) -> 'Position':
         return Position(-self.x, -self.y)
 
+    def __mul__(self, other: float):
+        return Position(self.x * other, self.y * other)
+
+    def __truediv__(self, other: float):
+        return Position(self.x / other, self.y / other)
+
 
 class Transformation:
     """
@@ -87,6 +93,12 @@ class Transformation:
         return Transformation(self.translation.translate(other.translation.rotate(self.rotation)),
                               self.rotation + other.rotation)
 
+    def __mul__(self, other: float):
+        return Transformation(self.translation * other, self.rotation)
+
+    def __truediv__(self, other: float):
+        return Transformation(self.translation / other, self.rotation)
+
 
 class Node(metaclass=abc.ABCMeta):
     """
@@ -111,6 +123,9 @@ class Node(metaclass=abc.ABCMeta):
         self.end_transform = None
         self.local_transform = Transformation()
 
+        self.is_start = False
+        self.is_end = False
+
     def get_parent_root(self) -> Transformation:
         return self.parent.get_root() if self.parent else Transformation()
 
@@ -127,6 +142,18 @@ class Node(metaclass=abc.ABCMeta):
         since this is also the length it will take up on a circle, if it were to be lain out onto one.
         """
         pass
+
+    @abc.abstractmethod
+    def set_as_start(self):
+        """
+        Assign or delegate to children to assign the strand start
+        """
+
+    @abc.abstractmethod
+    def set_as_end(self):
+        """
+        Assign or delegate to children to assign the strand end
+        """
 
     @abc.abstractmethod
     def needs_circle_fix(self) -> bool:
@@ -170,10 +197,16 @@ class Gap(Node):
         self.length = DEFAULT_SPACING_GAP
 
     def __repr__(self):
-        return f'Gap({self.length})'
+        return f'Gap({"" if self.is_start else ">"}{self.length}{"" if self.is_end else ">"})'
 
     def start_to_end(self) -> float:
         return self.length
+
+    def set_as_start(self):
+        self.is_start = True
+
+    def set_as_end(self):
+        self.is_end = True
 
     def needs_circle_fix(self) -> bool:
         return False
@@ -200,10 +233,16 @@ class Domain(Node):
         self.length = DEFAULT_DOMAIN_LENGTH
 
     def __repr__(self):
-        return f'Domain({self.source.name})'
+        return f'Domain({"" if self.is_start else ">"}{self.source.name}{"" if self.is_end else ">"})'
 
     def start_to_end(self) -> float:
         return self.length
+
+    def set_as_start(self):
+        self.is_start = True
+
+    def set_as_end(self):
+        self.is_end = True
 
     def needs_circle_fix(self) -> bool:
         return False
@@ -235,6 +274,12 @@ class Hairpin(Node):
 
     def start_to_end(self) -> float:
         return self.gap
+
+    def set_as_start(self):
+        self.pre.set_as_start()
+
+    def set_as_end(self):
+        self.post.set_as_end()
 
     def needs_circle_fix(self) -> bool:
         return True
@@ -276,6 +321,12 @@ class SplitComplex(Node):
     def start_to_end(self) -> float:
         return self.gap
 
+    def set_as_start(self):
+        self.pre.set_as_start()
+
+    def set_as_end(self):
+        self.post.set_as_end()
+
     def needs_circle_fix(self) -> bool:
         return True
 
@@ -290,12 +341,21 @@ class SplitComplex(Node):
         if self.left:
             self.left.layout(None, layout_circular=False)
             self.left.local_transform = Transformation(Position(0.0, -self.pre.length), -angle_from_forward)
+
+            self.left.set_as_end()
+        else:
+            self.pre.set_as_end()
+
         if self.right:
             self.right.layout(None, layout_circular=False)
             # TODO: If the right hand chain is a [Domain], its final angle is off by -pi/2, possible the end_transform
             # of the Chain is wrong also
             self.right.local_transform = Transformation(Position(self.gap, -self.post.length), angle_from_forward) \
                 + self.right.end_transform.inverse()
+
+            self.right.set_as_start()
+        else:
+            self.post.set_as_start()
 
         if circle_radius:
             # Inverse crd(theta) (\theta = 2 \cdot arcsin(\dfrac{c}{2r}))
@@ -318,6 +378,12 @@ class Chain(Node):
     def start_to_end(self) -> float:
         # Chains are never laid out as components of circles, so this works. Probably a better way to do it though
         return DEFAULT_BOUND_GAP
+
+    def set_as_start(self):
+        self.within[0].set_as_start()
+
+    def set_as_end(self):
+        self.within[-1].set_as_end()
 
     def needs_circle_fix(self) -> bool:
         return False
