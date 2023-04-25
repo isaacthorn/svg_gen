@@ -98,7 +98,10 @@ class SVGRenderer(Renderer):
             self.colour = colour
             self.position = start_pos
 
-            self.path = svg.path(f'M{self.position[0]},{self.position[1]}', fill='none', stroke=self.get_colour())
+            self.path = svg.path(f'M{self.position[0]},{self.position[1]}',
+                                 fill='none',
+                                 stroke=self.get_colour(),
+                                 stroke_linecap='square')
 
         def get_colour(self) -> str:
             return f'rgb({self.colour[0]}, {self.colour[1]}, {self.colour[2]})'
