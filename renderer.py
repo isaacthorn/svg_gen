@@ -1,10 +1,13 @@
 import math
 
-import complex
 import parse
 import geometry
 
 import svgwrite
+
+
+DEFAULT_ARROWHEAD_BODY_LEN = 5
+DEFAULT_ARROWHEAD_HEAD_LEN = 4
 
 
 class Renderer:
@@ -101,7 +104,7 @@ class SVGRenderer(Renderer):
             self.path = svg.path(f'M{self.position[0]},{self.position[1]}',
                                  fill='none',
                                  stroke=self.get_colour(),
-                                 stroke_linecap='square')
+                                 stroke_linecap='round')
 
         def get_colour(self) -> str:
             return f'rgb({self.colour[0]}, {self.colour[1]}, {self.colour[2]})'
@@ -149,7 +152,6 @@ class SVGRenderer(Renderer):
 
         self.svg.add(lines_path)
 
-
     def visit_node(self, node: geometry.Node):
         if not node:
             return
@@ -185,16 +187,17 @@ class SVGRenderer(Renderer):
                 self.cur_strand.add_curved_line((end.translation.x, end.translation.y),
                                                 node.circle_radius,
                                                 node.circle_theta)
-
-            #angle_line_end = end.translation.translate(geometry.Position(4.0, 0.0)
-            #                                           .rotate(end.rotation - (math.pi * 0.75)))
-            #angle_line = self.svg.line((end.translation.x, end.translation.y),
-            #                           (angle_line_end.x, angle_line_end.y),
-            #                           stroke='black')
-            #self.svg.add(angle_line)
-
             if node.is_end:
                 # Add 3' end arrowhead
+                arrow_body = geometry.Transformation(geometry.Position(DEFAULT_ARROWHEAD_BODY_LEN, 0.0),
+                                                     -0.75 * math.pi)
+                arrow_head = geometry.Transformation(geometry.Position(DEFAULT_ARROWHEAD_HEAD_LEN, 0.0))
+
+                arrow_body_end = end + arrow_body
+                arrow_head_end = arrow_body_end + arrow_head
+
+                self.cur_strand.add_straight_line((arrow_body_end.translation.x, arrow_body_end.translation.y))
+                self.cur_strand.add_straight_line((arrow_head_end.translation.x, arrow_head_end.translation.y))
 
                 self.svg.add(self.cur_strand.path)
                 self.cur_strand = None
