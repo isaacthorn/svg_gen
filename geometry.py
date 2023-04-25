@@ -168,7 +168,7 @@ class Node(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def layout(self, circle_radius: Optional[float]):
+    def layout(self, circle_radius: Optional[float], **kwargs):
         """
         Calculate internal layout (end position)
 
@@ -211,7 +211,7 @@ class Gap(Node):
     def needs_circle_fix(self) -> bool:
         return False
 
-    def layout(self, circle_radius: Optional[float]):
+    def layout(self, circle_radius: Optional[float], **kwargs):
         self.circle_radius = circle_radius
         if self.circle_radius:
             # Calculate end transform as if we're on a circle
@@ -247,7 +247,7 @@ class Domain(Node):
     def needs_circle_fix(self) -> bool:
         return False
 
-    def layout(self, circle_radius: Optional[float]):
+    def layout(self, circle_radius: Optional[float], **kwargs):
         self.circle_radius = circle_radius
         if self.circle_radius:
             # Calculate end transform as if we're on a circle
@@ -284,7 +284,7 @@ class Hairpin(Node):
     def needs_circle_fix(self) -> bool:
         return True
 
-    def layout(self, circle_radius: Optional[float]):
+    def layout(self, circle_radius: Optional[float], **kwargs):
         self.pre.layout(None)
         self.pre.local_transform = Transformation(Position(), 0.0)
 
@@ -330,7 +330,7 @@ class SplitComplex(Node):
     def needs_circle_fix(self) -> bool:
         return True
 
-    def layout(self, circle_radius: Optional[float]):
+    def layout(self, circle_radius: Optional[float], **kwargs):
         self.pre.layout(None)
         self.pre.local_transform = Transformation(Position(), 0.0)
 
@@ -388,7 +388,7 @@ class Chain(Node):
     def needs_circle_fix(self) -> bool:
         return False
 
-    def calculate_inner_radius(self) -> float:
+    def calculate_inner_radius(self, hidden_gap: float = DEFAULT_BOUND_GAP) -> float:
         """
         Work out how big the circle should be for the inner chain
         """
@@ -407,20 +407,25 @@ class Chain(Node):
         of iterative solution (e.g. Newton-Raphson) to approximate the radius more precisely, but just summing all 
         distances equally will work well enough for now.
         """
-        circumference = sum(node.start_to_end() for node in self.within) + DEFAULT_BOUND_GAP
+        circumference = sum(node.start_to_end() for node in self.within) + hidden_gap
         return circumference / (2.0 * math.pi)
 
-    def check_needs_gap(self, i: int) -> bool:
+    def check_needs_gap(self, i: int, omit_end_gap: bool = False) -> bool:
         """
         Should we insert a Gap element between within[i] and within[i + 1]
         (The final element of within precedes a Domain, since it comes before self.post)
         A gap needs to be inserted between any pair of children which are BOTH NOT domains (e.g hairpin -> hairpin)
         """
         if i + 1 == len(self.within):
-            return not isinstance(self.within[i], Domain)
+            return not isinstance(self.within[i], Domain) and not omit_end_gap
         return not isinstance(self.within[i], Domain) and not isinstance(self.within[i + 1], Domain)
 
-    def layout(self, circle_radius: Optional[float], layout_circular: bool = True):
+    def layout(self,
+               circle_radius: Optional[float],
+               layout_circular: bool = True,
+               hidden_gap: float = DEFAULT_BOUND_GAP,
+               omit_end_gap: bool = False,
+               **kwargs):
         """
         :param layout_circular: Only valid for chains, determines whether the chain should be laid out in a circle or
         just end-to-end
@@ -436,12 +441,12 @@ class Chain(Node):
             new_within = []
             for i in range(len(self.within)):
                 new_within.append(self.within[i])
-                if self.check_needs_gap(i):
+                if self.check_needs_gap(i, omit_end_gap):
                     new_within.append(Gap(self))
             self.within = new_within
 
         # Calculate the radius of the circle
-        inner_radius = None if not layout_circular else self.calculate_inner_radius()
+        inner_radius = None if not layout_circular else self.calculate_inner_radius(hidden_gap=hidden_gap)
 
         # The transform which will be given to the current node
         cur_transform = Transformation()
@@ -476,7 +481,7 @@ def create_geometry(parent: Optional[Node], node: complex.Node) -> Node:
 
 def layout_geometry(root: complex.Node) -> Node:
     layout = create_geometry(None, root)
-    layout.layout(None)
+    layout.layout(None, omit_end_gap=True, hidden_gap=2 * DEFAULT_BOUND_GAP)
     layout.set_as_start()
     layout.set_as_end()
     return layout
