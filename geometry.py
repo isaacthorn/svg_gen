@@ -416,6 +416,8 @@ class Chain(Node):
         (The final element of within precedes a Domain, since it comes before self.post)
         A gap needs to be inserted between any pair of children which are BOTH NOT domains (e.g hairpin -> hairpin)
         """
+        if i == -1:
+            return not isinstance(self.within[0], Domain)
         if i + 1 == len(self.within):
             return not isinstance(self.within[i], Domain) and not omit_end_gap
         return not isinstance(self.within[i], Domain) and not isinstance(self.within[i + 1], Domain)
@@ -439,6 +441,8 @@ class Chain(Node):
         # Can't modify the list while iterating
         if layout_circular and len(self.within) > 1:
             new_within = []
+            if self.check_needs_gap(-1):
+                new_within.append(Gap(self))
             for i in range(len(self.within)):
                 new_within.append(self.within[i])
                 if self.check_needs_gap(i, omit_end_gap):
