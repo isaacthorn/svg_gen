@@ -122,7 +122,7 @@ class SVGRenderer(Renderer):
     def __init__(self, fileobj, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.svg = svgwrite.Drawing()
+        self.svg = None
         self.fileobj = fileobj
 
         self.cur_strand = None
@@ -143,8 +143,18 @@ class SVGRenderer(Renderer):
                              (246, 111,  21)]
         self.colour_stack.reverse()
 
+        self.extent = None
+
     def render(self):
-        self.root.local_transform = geometry.Transformation(geometry.Position(250.0, 50.0), -0.5 * math.pi)
+        self.extent = self.root.get_extent()
+        self.extent = (self.extent.start.translate(geometry.Position(-25.0, -25.0)),
+                       self.extent.end.translate(geometry.Position(25.0, 25.0)))
+
+        self.svg = svgwrite.Drawing(size=(self.extent[1].x - self.extent[0].x,
+                                          self.extent[1].y - self.extent[0].y))
+
+        self.root.local_transform = geometry.Transformation(-self.extent[0], 0.0)
+
         self.visit_node(self.root)
         self.svg.write(self.fileobj)
 

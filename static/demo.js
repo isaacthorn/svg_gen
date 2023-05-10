@@ -18,8 +18,14 @@ function UpdateAST(ast)
 function UpdateSVG(svg)
 {
     let svg_area = document.getElementById('svg-container')
+    let existing_svgs = document.getElementsByClassName('result-image')
+    for(let i = 0; i < existing_svgs.length; i++)
+    {
+        svg_area.removeChild(existing_svgs[i]);
+    }
     let svg_element = document.createElement('svg');
     svg_element.innerHTML = svg
+    svg_element.className = 'result-image'
     svg_area.appendChild(svg_element)
 }
 

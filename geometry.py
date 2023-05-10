@@ -1,5 +1,6 @@
+import dataclasses
 from itertools import pairwise
-from typing import Optional
+from typing import Optional, Tuple
 
 import complex
 import math
@@ -9,7 +10,6 @@ import abc
 DEFAULT_DOMAIN_LENGTH = 50
 DEFAULT_BOUND_GAP = 5
 DEFAULT_SPACING_GAP = 5
-
 
 class Position:
     def __init__(self, x: float = 0.0, y: float = 0.0):
@@ -44,6 +44,9 @@ class Position:
         """
         return Position(self.x + translation.x,
                         self.y + translation.y)
+
+    def apply(self, transformation: 'Transformation') -> 'Position':
+        return self.rotate(transformation.rotation).translate(transformation.translation)
 
     def rotate(self, theta: float):
         """
@@ -100,6 +103,38 @@ class Transformation:
         return Transformation(self.translation / other, self.rotation)
 
 
+@dataclasses.dataclass
+class Extent:
+    start: Position
+    end: Position
+
+    @property
+    def top_right(self):
+        return Position(self.end.x, self.start.y)
+
+    @property
+    def bottom_left(self):
+        return Position(self.start.x, self.end.y)
+
+    def transform_extent(self, transformation: Transformation) -> 'Extent':
+        tl, tr, bl, br = self.start, self.top_right, self.bottom_left, self.end
+        new_tl, new_tr, new_bl, new_br = \
+            tl.apply(transformation), \
+            tr.apply(transformation), \
+            bl.apply(transformation), \
+            br.apply(transformation)
+
+        new_start = Position(min(new_tl.x, new_tr.x, new_bl.x, new_br.x), min(new_tl.y, new_tr.y, new_bl.y, new_br.y))
+        new_end = Position(max(new_tl.x, new_tr.x, new_bl.x, new_br.x), max(new_tl.y, new_tr.y, new_bl.y, new_br.y))
+        return Extent(new_start, new_end)
+
+    @staticmethod
+    def combine_extents(extents: list['Extent']) -> 'Extent':
+        start = Position(min(extents, key=lambda e: e.start.x).start.x, min(extents, key=lambda e: e.start.y).start.y)
+        end = Position(max(extents, key=lambda e: e.end.x).end.x, max(extents, key=lambda e: e.end.y).end.y)
+        return Extent(start, end)
+
+
 class Node(metaclass=abc.ABCMeta):
     """
     Base class for all nodes within the geometry tree
@@ -131,6 +166,10 @@ class Node(metaclass=abc.ABCMeta):
 
     def get_root(self) -> Transformation:
         return self.get_parent_root() + self.local_transform
+
+    @abc.abstractmethod
+    def get_extent(self) -> Extent:
+        pass
 
     @abc.abstractmethod
     def start_to_end(self) -> float:
@@ -199,6 +238,16 @@ class Gap(Node):
     def __repr__(self):
         return f'Gap({"" if self.is_start else ">"}{self.length}{"" if self.is_end else ">"})'
 
+    def get_extent(self) -> Extent:
+        if not self.circle_radius:
+            start = Position(0.0, -self.length)
+            end = Position(0.0, 0.0)
+            return Extent(start, end)
+
+        start = Position()
+        end = self.end_transform.translation
+        return Extent(start, end)
+
     def start_to_end(self) -> float:
         return self.length
 
@@ -234,6 +283,11 @@ class Domain(Node):
 
     def __repr__(self):
         return f'Domain({"" if self.is_start else ">"}{self.source.name}{"" if self.is_end else ">"})'
+
+    def get_extent(self) -> Extent:
+        start = Position(0.0, -self.length)
+        end = Position(0.0, 0.0)
+        return Extent(start, end)
 
     def start_to_end(self) -> float:
         return self.length
@@ -271,6 +325,13 @@ class Hairpin(Node):
 
     def __repr__(self):
         return f'Hairpin({self.pre.source.name}){repr(self.inner)}'
+
+    def get_extent(self) -> Extent:
+        loop_extent = self.inner.get_extent().transform_extent(self.inner.local_transform)
+        pre_extent = self.pre.get_extent().transform_extent(self.pre.local_transform)
+        post_extent = self.post.get_extent().transform_extent(self.post.local_transform)
+
+        return Extent.combine_extents([loop_extent, pre_extent, post_extent])
 
     def start_to_end(self) -> float:
         return self.gap
@@ -317,6 +378,14 @@ class SplitComplex(Node):
 
     def __repr__(self):
         return f'SplitComplex({self.pre.source.name})<{repr(self.left)},{repr(self.right)}>'
+
+    def get_extent(self) -> Extent:
+        pre_extent = self.pre.get_extent().transform_extent(self.pre.local_transform)
+        post_extent = self.post.get_extent().transform_extent(self.post.local_transform)
+        left_extent = [self.left.get_extent().transform_extent(self.left.local_transform)] if self.left else []
+        right_extent = [self.right.get_extent().transform_extent(self.right.local_transform)] if self.right else []
+
+        return Extent.combine_extents([pre_extent, post_extent] + left_extent + right_extent)
 
     def start_to_end(self) -> float:
         return self.gap
@@ -370,10 +439,15 @@ class Chain(Node):
         super().__init__(parent, source)
 
         self.within = [create_geometry(self, node) for node in source.within]
+        self.is_circle = False
 
     def __repr__(self):
         within_str = ', '.join(repr(node) for node in self.within)
         return f'[{within_str}]'
+
+    def get_extent(self) -> Extent:
+        extents = [m.get_extent().transform_extent(m.local_transform) for m in self.within]
+        return Extent.combine_extents(extents)
 
     def start_to_end(self) -> float:
         # Chains are never laid out as components of circles, so this works. Probably a better way to do it though
@@ -436,6 +510,8 @@ class Chain(Node):
         # If we only have one child, and it isn't curvable, we don't NEED to layout on a circle (we can't)
         if len(self.within) == 1 and self.within[0].needs_circle_fix():
             layout_circular = False
+
+        self.is_circle = layout_circular
 
         # If we're on a circle with len() > 1, insert gaps between pairs of non-domain children
         # Can't modify the list while iterating
