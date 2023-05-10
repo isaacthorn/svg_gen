@@ -15,6 +15,14 @@ function UpdateAST(ast)
     ast_area.innerText = JSON.stringify(ast, null, 2);
 }
 
+function UpdateSVG(svg)
+{
+    let svg_area = document.getElementById('svg-container')
+    let svg_element = document.createElement('svg');
+    svg_element.innerHTML = svg
+    svg_area.appendChild(svg_element)
+}
+
 let current_text = null;
 function SubmitNewInput()
 {
@@ -30,6 +38,7 @@ function SubmitNewInput()
         .then((result) => {
             UpdateTokens(result.tokens);
             UpdateAST(result.ast);
+            UpdateSVG(result.svg);
             current_text = input_text;
         })
         .catch((error) => {

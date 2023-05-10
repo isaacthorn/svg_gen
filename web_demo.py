@@ -1,4 +1,5 @@
 from flask import Flask, jsonify, render_template, request
+from io import StringIO
 
 app = Flask(__name__)
 
@@ -9,22 +10,39 @@ def index():
 
 @app.route('/run')
 def run():
+    def create_result(message, tokenised, ast, image):
+        return jsonify({
+            'message': message,
+            'tokens': [{'type': token.type, 'value': token.value} for token in tokens] if tokenised else None,
+            'ast': ast,
+            'svg': image
+        })
+
     input_text = request.args.get('input', '')
 
     import lex
-    tokens = lex.tokenise(input_text)
+    try:
+        tokens = lex.tokenise(input_text)
+    except ValueError:
+        return create_result('Error while tokenising input', None, None, None)
 
     import parse
-    parsed = parse.parse(input_text)
+    try:
+        parsed = parse.parse(input_text)
+    except ValueError:
+        return create_result('Error while parsing input', tokens, None, None)
 
-    result = jsonify({
-        'tokens': [{'type': token.type, 'value': token.value} for token in tokens],
-        'ast': parsed,
-        'svg': None,
-    })
+    import geometry
+    import renderer
 
-    return result
+    svg = StringIO()
+
+    geom = geometry.layout_geometry(parsed)
+    renderer.SVGRenderer(svg, geom).render()
+
+    print(svg.getvalue())
+    return create_result('Successfully created diagram', tokens, parsed, svg.getvalue())
 
 
 if __name__ == '__main__':
-    app.run(host='192.168.0.16', port=80, debug=True)
+    app.run(host='localhost', port=80, debug=True)

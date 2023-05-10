@@ -119,13 +119,24 @@ class SVGRenderer(Renderer):
                                large_arc=(theta > math.pi),
                                absolute=True)
 
-    def __init__(self, filename, *args, **kwargs):
+    def __init__(self, fileobj, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.svg = svgwrite.Drawing(filename)
+        self.svg = svgwrite.Drawing()
+        self.fileobj = fileobj
 
         self.cur_strand = None
         self.colour_stack = [(220,  35,  32),
+                             ( 68, 114, 189),
+                             ( 77, 173,  63),
+                             (149,  52, 168),
+                             (246, 111,  21),
+                             (220,  35,  32),
+                             (68,  114, 189),
+                             (77,  173,  63),
+                             (149,  52, 168),
+                             (246, 111,  21),
+                             (220,  35,  32),
                              ( 68, 114, 189),
                              ( 77, 173,  63),
                              (149,  52, 168),
@@ -133,9 +144,9 @@ class SVGRenderer(Renderer):
         self.colour_stack.reverse()
 
     def render(self):
-        self.root.local_transform = geometry.Transformation(geometry.Position(250.0, 250.0), -0.5 * math.pi)
+        self.root.local_transform = geometry.Transformation(geometry.Position(250.0, 50.0), -0.5 * math.pi)
         self.visit_node(self.root)
-        self.svg.save()
+        self.svg.write(self.fileobj)
 
     def draw_bond_lines(self, left: geometry.Node, right: geometry.Node):
         lines_count = 8
@@ -205,6 +216,11 @@ class SVGRenderer(Renderer):
             raise NotImplementedError()
 
 
+class FileRenderer(SVGRenderer):
+    def __init__(self, filename, *args, **kwargs):
+        super().__init__(open(filename, 'w'), *args, **kwargs)
+
+
 if __name__ == '__main__':
     from sys import argv
 
@@ -217,5 +233,5 @@ if __name__ == '__main__':
 
     layout = geometry.layout_geometry(ast)
 
-    renderer = SVGRenderer('out.svg', root=layout)
+    renderer = FileRenderer('out.svg', root=layout)
     renderer.render()
